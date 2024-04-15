@@ -209,8 +209,6 @@ class PoorsManTrainer:
 
     def _wrap_model(self, model):
 
-        logger.info("Wrapping model")
-
         if self.use_fsdp:
             auto_wrap_policy = None
             auto_wrapper_callable = None
@@ -330,7 +328,7 @@ class PoorsManTrainer:
         sample_count = self.train_batch_size * self.args.logging_steps
         total_steps = 0
         start_time = timer()
-        adjusted_total_steps = -5
+        adjusted_total_steps = -10
         for step in range(start_step, max_step + 1):
             try:
                 batch = next(train_iterator)
@@ -383,10 +381,6 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    # print(model_args)
-    # print(data_args)
-    # print(training_args)
-
     # Configure logging
     if training_args.should_log:
         # The default of training_args.log_level is passive, so we set log level at info here to have that default.
@@ -403,12 +397,6 @@ def main():
     # server = xp.start_server(9012)
     # logger.info(f'Profiling server started: {str(server)}')
 
-    # Create the model
-    # TBD
-    # Currently we intialize all model weights at once on a host. Since v5e has a limited CPU memory
-    # we may need to modify this process for larger models
-    # We also need to add loading the existing checkpoint
-
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_id)
     config = AutoConfig.from_pretrained(
         model_args.model_id,
@@ -416,10 +404,12 @@ def main():
         torch_dtype=model_args.torch_dtype,
     )
     model = EsmForMaskedLM(config)
+    logger.info(f"Loaded model: {model_args.model_id}")
+    logger.info(f"Model parameters: {model.num_parameters}")
+
     model = apply_xla_patch_to_nn_linear(
         model, xs.xla_patched_nn_linear_forward)
-    print(model)
-    logger.info(f"Number of model parameters: {model.num_parameters()}")
+
     model = model.to(xm.xla_device(), dtype=getattr(
         torch, model_args.torch_dtype))
 
