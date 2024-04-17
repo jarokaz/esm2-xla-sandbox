@@ -2,5 +2,5 @@
     "xla": true,
     "xla_fsdp_v2": true,
     "xla_fsdp_grad_ckpt": true,
-    "transformer_layer_cls_to_wrap": ["EsmSelfAttention", "EsmSelfOutput", "EsmIntermediate", "EsmOutput", "EsmLMHead"]
+    "transformer_layer_cls_to_wrap": ["EsmEmbeddings","EsmSelfAttention", "EsmSelfOutput", "EsmIntermediate", "EsmOutput", "EsmLMHead"]
 }

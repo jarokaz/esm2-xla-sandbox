@@ -16,10 +16,8 @@
 apiVersion: jobset.x-k8s.io/v1alpha2
 kind: JobSet
 metadata:
-  name: esm2-training  
-  namespace: tpu-training
-  labels:
-    kueue.x-k8s.io/queue-name: tpu-training-jobs
+  name: jk-esm2-training  
+  namespace: tpu-namespace
   annotations:
     alpha.jobset.sigs.k8s.io/exclusive-topology: cloud.google.com/gke-nodepool # 1:1 job replica to node pool assignment
 spec:
@@ -34,20 +32,20 @@ spec:
       replicas: 1    # Number of slices
       template:
         spec:
-          parallelism: 16   # Must be set to number of nodes in each node pool
-          completions: 16   # Must be set to number of nodes in each node pool
+          parallelism: 64   # Must be set to number of nodes in each node pool
+          completions: 64   # Must be set to number of nodes in each node pool
           backoffLimit: 0   # Must be set to 0. Fail the job when any pod fails.
           template:
-            #metadata:
-            #  annotations:
-            #    gke-gcsfuse/volumes: "true"
+            metadata:
+              #annotations:
+              #  gke-gcsfuse/volumes: "true"
             spec:
               hostNetwork: false # Need to enable WID for GCS 
-              serviceAccount: wid-ksa
+              serviceAccount: tpu-sa
               dnsPolicy: ClusterFirstWithHostNet
               nodeSelector:
                 cloud.google.com/gke-tpu-accelerator: tpu-v5-lite-podslice
-                cloud.google.com/gke-tpu-topology: 8x8
+                cloud.google.com/gke-tpu-topology: 16x16
               containers:
               - name: tpu-job 
                 image: pytorch-xla
@@ -64,10 +62,14 @@ spec:
                 - -c
                 - |
                   echo Copying training data to a local folder 
-                  mkdir -p /datasets/uniref 
-                  # cp -r /gcs/artifact-repository/datasets/uniref/tokenized/arrow/train/ /datasets/uniref
-                  gcloud storage rsync --recursive --no-clobber  gs://jk101-artifact-repository/datasets/uniref/tokenized/arrow/ /datasets/uniref 
-                  ls -la /datasets/uniref 
+                  #mkdir -p /model_data/datasets/uniref 
+                  mkdir /datasets/uniref
+                  #cp -r /gcs/gsa-pso-aiml-repository/uniref_data/tokenized/arrow/* /model_data/datasets/uniref
+                  gcloud storage rsync --recursive --no-clobber  gs://gsa-pso-aiml-repository/uniref_data/tokenized/arrow/ /datasets/uniref 
+                  #ls -la /model_data/datasets/uniref 
+                  ls -la /datasets/uniref
+                  
+                  echo -------- Starting training 
                    
                   #tail -f /dev/null
                   python run_esm2.py \
@@ -76,7 +78,7 @@ spec:
                   --output_dir /runs/run1 \
                   --cache_dir /tmp \
                   --overwrite_output_dir \
-                  --per_device_train_batch_size 384 \
+                  --per_device_train_batch_size 512 \
                   --do_train \
                   --save_strategy no \
                   --logging_strategy steps \
@@ -85,31 +87,56 @@ spec:
                   --dataloader_drop_last yes \
                   --fsdp "full_shard" \
                   --fsdp_config fsdp_config.json \
-                  --max_steps 100 
+                  --max_steps 100 2>&1 | tee execution.log
+
+                  if [[ $? -eq 0 ]]; then
+                      echo "Training script succeeded"
+                  else 
+                      echo "Training script failed"
+                      ls -la 
+                  fi
+                  gsutil cp execution.log gs://gsa-pso-aiml-repository/ESM216B-256-tests/traces/
                 env:
                 - name: PJRT_DEVICE
                   value: 'TPU'
                 - name: XLA_USE_BF16
                   value: '1'
-                - name: LIBTPU_INIT_ARGS
-                  value: '--xla_tpu_enable_data_parallel_all_reduce_opt=true --xla_tpu_data_parallel_opt_different_sized_ops=true --xla_tpu_enable_async_collective_fusion=true --xla_tpu_enable_async_collective_fusion_fuse_all_gather=true --xla_tpu_enable_async_collective_fusion_multiple_steps=true --xla_tpu_overlap_compute_collective_tc=true --xla_enable_async_all_gather=true'
+                #- name: XLA_IR_DEBUG 
+                #  value: '1'
+                #- name: XLA_HLO_DEBUG
+                #  value: '1'
+                #- name: PT_XLA_DEBUG
+                #  value: '1'
+                #- name: 'XLA_SAVE_TENSORS_FILE'
+                #  value: 'trace.ir'
+                #- name: LIBTPU_INIT_ARGS
+                #  value: '--xla_tpu_enable_data_parallel_all_reduce_opt=true --xla_tpu_data_parallel_opt_different_sized_ops=true --xla_tpu_enable_async_collective_fusion=true --xla_tpu_enable_async_collective_fusion_fuse_all_gather=true --xla_tpu_enable_async_collective_fusion_multiple_steps=true --xla_tpu_overlap_compute_collective_tc=true --xla_enable_async_all_gather=true'
                 #volumeMounts:
-                #- name: datasets-cache
-                #  mountPath: /datasets
-                #- name: gcs-artifact-repository
-                #  mountPath: /gcs/artifact-repository
-                #  readOnly: true
+                #- name: gcs-fuse-csi-vol
+                #  mountPath: /gcs
+                #  readOnly: false
+                #- name: data-volume
+                #  mountPath: /model_data
                 resources:
                   limits:
                     google.com/tpu: 4 # Number of Cloud TPU VMs per worker
               #volumes:
-              #- name: datasets-cache
-              #  emptyDir:
-              #    sizeLimit: 100Gi
-              #- name: gcs-artifact-repository
+              #- name: gcs-fuse-csi-vol
               #  csi:
               #    driver: gcsfuse.csi.storage.gke.io
-              #    readOnly: true
+              #    readOnly: false
               #    volumeAttributes:
-              #      bucketName: jk101-artifact-repository
+              #      bucketName: _
               #      mountOptions: "implicit-dirs"
+              #- name: data-volume
+              #  ephemeral:
+              #    volumeClaimTemplate:
+              #      metadata:
+              #        labels:
+              #          type: pso-model-data
+              #      spec:
+              #        accessModes: [ "ReadWriteOnce" ]
+              #        storageClassName: "premium-rwo"
+              #        resources:
+              #          requests:
+              #            storage: 200Gi
