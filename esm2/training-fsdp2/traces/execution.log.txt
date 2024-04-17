@@ -1,0 +1,269 @@
+[INFO|tokenization_utils_base.py:2087] 2024-04-17 19:04:53,833 >> loading file vocab.txt from cache at /root/.cache/huggingface/hub/models--facebook--esm2_t48_15B_UR50D/snapshots/5fbca39631164edc1d402a5aa369f982f72ee282/vocab.txt
+[INFO|tokenization_utils_base.py:2087] 2024-04-17 19:04:53,833 >> loading file added_tokens.json from cache at None
+[INFO|tokenization_utils_base.py:2087] 2024-04-17 19:04:53,833 >> loading file special_tokens_map.json from cache at /root/.cache/huggingface/hub/models--facebook--esm2_t48_15B_UR50D/snapshots/5fbca39631164edc1d402a5aa369f982f72ee282/special_tokens_map.json
+[INFO|tokenization_utils_base.py:2087] 2024-04-17 19:04:53,833 >> loading file tokenizer_config.json from cache at /root/.cache/huggingface/hub/models--facebook--esm2_t48_15B_UR50D/snapshots/5fbca39631164edc1d402a5aa369f982f72ee282/tokenizer_config.json
+[INFO|tokenization_utils_base.py:2087] 2024-04-17 19:04:53,833 >> loading file tokenizer.json from cache at None
+[INFO|configuration_utils.py:726] 2024-04-17 19:04:54,083 >> loading configuration file config.json from cache at /root/.cache/huggingface/hub/models--facebook--esm2_t48_15B_UR50D/snapshots/5fbca39631164edc1d402a5aa369f982f72ee282/config.json
+[INFO|configuration_utils.py:789] 2024-04-17 19:04:54,084 >> Model config EsmConfig {
+  "_name_or_path": "facebook/esm2_t48_15B_UR50D",
+  "architectures": [
+    "EsmForMaskedLM"
+  ],
+  "attention_probs_dropout_prob": 0.0,
+  "classifier_dropout": null,
+  "emb_layer_norm_before": false,
+  "esmfold_config": null,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.0,
+  "hidden_size": 5120,
+  "initializer_range": 0.02,
+  "intermediate_size": 20480,
+  "is_folding_model": false,
+  "layer_norm_eps": 1e-05,
+  "mask_token_id": 32,
+  "max_position_embeddings": 1026,
+  "model_type": "esm",
+  "num_attention_heads": 40,
+  "num_hidden_layers": 48,
+  "pad_token_id": 1,
+  "position_embedding_type": "rotary",
+  "token_dropout": true,
+  "torch_dtype": "bfloat16",
+  "transformers_version": "4.40.0.dev0",
+  "use_cache": true,
+  "vocab_list": null,
+  "vocab_size": 33
+}
+
+INFO:__main__:Loaded model: facebook/esm2_t48_15B_UR50D
+INFO:__main__:Model parameters: <bound method ModuleUtilsMixin.num_parameters of EsmForMaskedLM(
+  (esm): EsmModel(
+    (embeddings): EsmEmbeddings(
+      (word_embeddings): Embedding(33, 5120, padding_idx=1)
+      (dropout): Dropout(p=0.0, inplace=False)
+      (position_embeddings): Embedding(1026, 5120, padding_idx=1)
+    )
+    (encoder): EsmEncoder(
+      (layer): ModuleList(
+        (0-47): 48 x EsmLayer(
+          (attention): EsmAttention(
+            (self): EsmSelfAttention(
+              (query): Linear(in_features=5120, out_features=5120, bias=True)
+              (key): Linear(in_features=5120, out_features=5120, bias=True)
+              (value): Linear(in_features=5120, out_features=5120, bias=True)
+              (dropout): Dropout(p=0.0, inplace=False)
+              (rotary_embeddings): RotaryEmbedding()
+            )
+            (output): EsmSelfOutput(
+              (dense): Linear(in_features=5120, out_features=5120, bias=True)
+              (dropout): Dropout(p=0.0, inplace=False)
+            )
+            (LayerNorm): LayerNorm((5120,), eps=1e-05, elementwise_affine=True)
+          )
+          (intermediate): EsmIntermediate(
+            (dense): Linear(in_features=5120, out_features=20480, bias=True)
+          )
+          (output): EsmOutput(
+            (dense): Linear(in_features=20480, out_features=5120, bias=True)
+            (dropout): Dropout(p=0.0, inplace=False)
+          )
+          (LayerNorm): LayerNorm((5120,), eps=1e-05, elementwise_affine=True)
+        )
+      )
+      (emb_layer_norm_after): LayerNorm((5120,), eps=1e-05, elementwise_affine=True)
+    )
+    (contact_head): EsmContactPredictionHead(
+      (regression): Linear(in_features=1920, out_features=1, bias=True)
+      (activation): Sigmoid()
+    )
+  )
+  (lm_head): EsmLMHead(
+    (dense): Linear(in_features=5120, out_features=5120, bias=True)
+    (layer_norm): LayerNorm((5120,), eps=1e-05, elementwise_affine=True)
+    (decoder): Linear(in_features=5120, out_features=33, bias=False)
+  )
+)>
+INFO:__main__:Logical mesh shape: OrderedDict([('fsdp', 256), ('tensor', 1)])
+INFO:__main__:Input sharding: ShardingSpec(mesh=<torch_xla.distributed.spmd.xla_sharding.Mesh object at 0x7e6822c4f810>, partition_spec=('fsdp', None), minibatch=False, _tile_assignment=[[0], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12], [13], [14], [15], [16], [17], [18], [19], [20], [21], [22], [23], [24], [25], [26], [27], [28], [29], [30], [31], [32], [33], [34], [35], [36], [37], [38], [39], [40], [41], [42], [43], [44], [45], [46], [47], [48], [49], [50], [51], [52], [53], [54], [55], [56], [57], [58], [59], [60], [61], [62], [63], [64], [65], [66], [67], [68], [69], [70], [71], [72], [73], [74], [75], [76], [77], [78], [79], [80], [81], [82], [83], [84], [85], [86], [87], [88], [89], [90], [91], [92], [93], [94], [95], [96], [97], [98], [99], [100], [101], [102], [103], [104], [105], [106], [107], [108], [109], [110], [111], [112], [113], [114], [115], [116], [117], [118], [119], [120], [121], [122], [123], [124], [125], [126], [127], [128], [129], [130], [131], [132], [133], [134], [135], [136], [137], [138], [139], [140], [141], [142], [143], [144], [145], [146], [147], [148], [149], [150], [151], [152], [153], [154], [155], [156], [157], [158], [159], [160], [161], [162], [163], [164], [165], [166], [167], [168], [169], [170], [171], [172], [173], [174], [175], [176], [177], [178], [179], [180], [181], [182], [183], [184], [185], [186], [187], [188], [189], [190], [191], [192], [193], [194], [195], [196], [197], [198], [199], [200], [201], [202], [203], [204], [205], [206], [207], [208], [209], [210], [211], [212], [213], [214], [215], [216], [217], [218], [219], [220], [221], [222], [223], [224], [225], [226], [227], [228], [229], [230], [231], [232], [233], [234], [235], [236], [237], [238], [239], [240], [241], [242], [243], [244], [245], [246], [247], [248], [249], [250], [251], [252], [253], [254], [255]], _group_assignment=[[0], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12], [13], [14], [15], [16], [17], [18], [19], [20], [21], [22], [23], [24], [25], [26], [27], [28], [29], [30], [31], [32], [33], [34], [35], [36], [37], [38], [39], [40], [41], [42], [43], [44], [45], [46], [47], [48], [49], [50], [51], [52], [53], [54], [55], [56], [57], [58], [59], [60], [61], [62], [63], [64], [65], [66], [67], [68], [69], [70], [71], [72], [73], [74], [75], [76], [77], [78], [79], [80], [81], [82], [83], [84], [85], [86], [87], [88], [89], [90], [91], [92], [93], [94], [95], [96], [97], [98], [99], [100], [101], [102], [103], [104], [105], [106], [107], [108], [109], [110], [111], [112], [113], [114], [115], [116], [117], [118], [119], [120], [121], [122], [123], [124], [125], [126], [127], [128], [129], [130], [131], [132], [133], [134], [135], [136], [137], [138], [139], [140], [141], [142], [143], [144], [145], [146], [147], [148], [149], [150], [151], [152], [153], [154], [155], [156], [157], [158], [159], [160], [161], [162], [163], [164], [165], [166], [167], [168], [169], [170], [171], [172], [173], [174], [175], [176], [177], [178], [179], [180], [181], [182], [183], [184], [185], [186], [187], [188], [189], [190], [191], [192], [193], [194], [195], [196], [197], [198], [199], [200], [201], [202], [203], [204], [205], [206], [207], [208], [209], [210], [211], [212], [213], [214], [215], [216], [217], [218], [219], [220], [221], [222], [223], [224], [225], [226], [227], [228], [229], [230], [231], [232], [233], [234], [235], [236], [237], [238], [239], [240], [241], [242], [243], [244], [245], [246], [247], [248], [249], [250], [251], [252], [253], [254], [255]], _replication_groups=[[0], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12], [13], [14], [15], [16], [17], [18], [19], [20], [21], [22], [23], [24], [25], [26], [27], [28], [29], [30], [31], [32], [33], [34], [35], [36], [37], [38], [39], [40], [41], [42], [43], [44], [45], [46], [47], [48], [49], [50], [51], [52], [53], [54], [55], [56], [57], [58], [59], [60], [61], [62], [63], [64], [65], [66], [67], [68], [69], [70], [71], [72], [73], [74], [75], [76], [77], [78], [79], [80], [81], [82], [83], [84], [85], [86], [87], [88], [89], [90], [91], [92], [93], [94], [95], [96], [97], [98], [99], [100], [101], [102], [103], [104], [105], [106], [107], [108], [109], [110], [111], [112], [113], [114], [115], [116], [117], [118], [119], [120], [121], [122], [123], [124], [125], [126], [127], [128], [129], [130], [131], [132], [133], [134], [135], [136], [137], [138], [139], [140], [141], [142], [143], [144], [145], [146], [147], [148], [149], [150], [151], [152], [153], [154], [155], [156], [157], [158], [159], [160], [161], [162], [163], [164], [165], [166], [167], [168], [169], [170], [171], [172], [173], [174], [175], [176], [177], [178], [179], [180], [181], [182], [183], [184], [185], [186], [187], [188], [189], [190], [191], [192], [193], [194], [195], [196], [197], [198], [199], [200], [201], [202], [203], [204], [205], [206], [207], [208], [209], [210], [211], [212], [213], [214], [215], [216], [217], [218], [219], [220], [221], [222], [223], [224], [225], [226], [227], [228], [229], [230], [231], [232], [233], [234], [235], [236], [237], [238], [239], [240], [241], [242], [243], [244], [245], [246], [247], [248], [249], [250], [251], [252], [253], [254], [255]], _sharding_type=<ShardingType.PARTIAL: 5>)
+INFO:__main__:ESM2 classes to wrap: {<class 'transformers.models.esm.modeling_esm.EsmOutput'>, <class 'transformers.models.esm.modeling_esm.EsmSelfAttention'>, <class 'transformers.models.esm.modeling_esm.EsmLMHead'>, <class 'transformers.models.esm.modeling_esm.EsmIntermediate'>, <class 'transformers.models.esm.modeling_esm.EsmSelfOutput'>, <class 'transformers.models.esm.modeling_esm.EsmEmbeddings'>}
+INFO:__main__:Enabling gradient checkpointing
+INFO:__main__:Starting training
+INFO:__main__:    Using FSDP
+INFO:__main__:    Start step: 1
+INFO:__main__:    Max step: 100
+INFO:__main__:    Global batch size: 512
+/usr/local/lib/python3.11/site-packages/torch/nn/modules/module.py:1602: UserWarning: For backward hooks to be called, module output should be a Tensor or a tuple of Tensors but received <class 'transformers.modeling_outputs.MaskedLMOutput'>
+  warnings.warn("For backward hooks to be called,"
+Traceback (most recent call last):
+  File "/transformers/run_esm2.py", line 460, in <module>
+    main()
+  File "/transformers/run_esm2.py", line 449, in main
+    results = trainer.train_loop()
+              ^^^^^^^^^^^^^^^^^^^^
+  File "/transformers/run_esm2.py", line 334, in train_loop
+    batch = next(train_iterator)
+            ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/torch_xla/distributed/parallel_loader.py", line 32, in __next__
+    return self.next()
+           ^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/torch_xla/distributed/parallel_loader.py", line 44, in next
+    xm.mark_step()
+  File "/usr/local/lib/python3.11/site-packages/torch_xla/core/xla_model.py", line 1055, in mark_step
+    torch_xla._XLAC._xla_step_marker(
+RuntimeError: Bad StatusOr access: RESOURCE_EXHAUSTED: XLA:TPU compile permanent error. Ran out of memory in memory space hbm. Used 17.69G of 15.75G hbm. Exceeded hbm capacity by 1.94G.
+
+Total hbm usage >= 17.94G:
+    reserved        258.00M 
+    program          17.69G 
+    arguments            0B 
+
+Output size 0B; shares 0B with arguments.
+
+Program hbm requirement 17.69G:
+    global           21.71M
+    scoped           545.0K
+    HLO temp         17.67G (100.0% utilization: Unpadded (13.90G) Padded (13.90G), 21.3% fragmentation (3.77G))
+
+  Largest program allocations in hbm:
+
+  1. Size: 200.00M
+     Shape: bf16[20480,5120]{1,0:T(8,128)(2,1)}
+     Unpadded size: 200.00M
+     XLA label: fusion.16454 = fusion(copy-done.889), kind=kCustom, output_to_operand_aliasing={{0}: (0, {})}, calls=fused_computation.10995
+     Allocation type: HLO temp
+     ==========================
+
+  2. Size: 200.00M
+     Shape: bf16[5120,20480,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 200.00M
+     XLA label: reshape.14502 = reshape(fusion.16446)
+     Allocation type: HLO temp
+     ==========================
+
+  3. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14587 = reshape(all-gather.12995.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  4. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14857 = reshape(fusion.16019)
+     Allocation type: HLO temp
+     ==========================
+
+  5. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14729 = reshape(custom-call.2008)
+     Allocation type: HLO temp
+     ==========================
+
+  6. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.15015 = reshape(fusion.16412)
+     Allocation type: HLO temp
+     ==========================
+
+  7. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14998 = reshape(all-gather.13137.remat2)
+     Allocation type: HLO temp
+     ==========================
+
+  8. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14724 = reshape(custom-call.2009)
+     Allocation type: HLO temp
+     ==========================
+
+  9. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14997 = reshape(all-gather.13136.remat2)
+     Allocation type: HLO temp
+     ==========================
+
+  10. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14996 = reshape(all-gather.13134.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  11. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14981 = reshape(all-gather.13130.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  12. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14722 = reshape(all-gather.13069.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  13. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14980 = reshape(all-gather.13129.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  14. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14979 = reshape(all-gather.13127.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  15. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14962 = reshape(all-gather.13123.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  16. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14805 = reshape(custom-call.1911)
+     Allocation type: HLO temp
+     ==========================
+
+  17. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14961 = reshape(all-gather.13122.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  18. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14960 = reshape(all-gather.13120.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  19. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14946 = reshape(all-gather.13116.remat)
+     Allocation type: HLO temp
+     ==========================
+
+  20. Size: 50.00M
+     Shape: bf16[5120,5120,1]{1,0,2:T(8,128)(2,1)}
+     Unpadded size: 50.00M
+     XLA label: reshape.14808 = reshape(fusion.15719)
+     Allocation type: HLO temp
+     ==========================
+
+
