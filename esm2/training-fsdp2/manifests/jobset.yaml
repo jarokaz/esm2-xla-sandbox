@@ -78,7 +78,7 @@ spec:
                   --output_dir /runs/run1 \
                   --cache_dir /tmp \
                   --overwrite_output_dir \
-                  --per_device_train_batch_size 512 \
+                  --per_device_train_batch_size 1024 \
                   --do_train \
                   --save_strategy no \
                   --logging_strategy steps \
@@ -95,7 +95,7 @@ spec:
                       echo "Training script failed"
                       ls -la 
                   fi
-                  gsutil cp execution.log gs://gsa-pso-aiml-repository/ESM216B-256-tests/traces/
+                  #gsutil cp execution.log gs://gsa-pso-aiml-repository/ESM216B-256-tests/traces/
                 env:
                 - name: PJRT_DEVICE
                   value: 'TPU'
