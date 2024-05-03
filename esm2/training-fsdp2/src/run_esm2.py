@@ -86,6 +86,9 @@ class ModelArguments:
     model_id: Optional[str] = field(
         default="facebook/esm2_t33_650M_UR50D", metadata={"help": "Pretrained config name or path if not the same as model_name"}
     )
+    tokenizer_name: Optional[str] = field(
+        default=None, metadata={"help": "Name of the tokenizer if different from model_id"}
+    )
     torch_dtype: Optional[str] = field(
         default="bfloat16",
         metadata={
@@ -416,7 +419,8 @@ def main():
     server = xp.start_server(9012)
     logger.info(f'Profiling server started: {str(server)}')
 
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_id)
+    tokenizer_name = model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_id
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
     config = AutoConfig.from_pretrained(
         model_args.model_id,
         vocab_size=len(tokenizer),
