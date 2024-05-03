@@ -86,7 +86,6 @@ class ModelArguments:
     model_id: Optional[str] = field(
         default="facebook/esm2_t33_650M_UR50D", metadata={"help": "Pretrained config name or path if not the same as model_name"}
     )
-
     torch_dtype: Optional[str] = field(
         default="bfloat16",
         metadata={
@@ -101,6 +100,18 @@ class ModelArguments:
         default=None,
         metadata={
             "help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
+    )
+
+@dataclass
+class MoreTrainingArguments(TrainingArguments):
+    profile_step: Optional[int] = field(
+        default=-1, metadata={"help": "Step to profile"}
+    )
+    profile_logdir: Optional[str] = field(
+        default=".", metadata={"help": "Directory to store the profile"}
+    )
+    profile_duration: Optional[int] = field(
+        default="20000", metadata={"help": "Duration (ms) to capture profile"}
     )
 
 
@@ -127,7 +138,7 @@ class PoorsManTrainer:
     def __init__(
         self,
         model: nn.Module,
-        args: TrainingArguments,
+        args: MoreTrainingArguments,
         data_collator: Optional[DataCollatorForLanguageModeling],
         train_dataset: Optional[Union[Dataset, IterableDataset]],
         eval_dataset: Optional[Union[Dataset, Dict[str, Dataset]]],
@@ -356,6 +367,14 @@ class PoorsManTrainer:
             total_steps += 1
             adjusted_total_steps += 1
 
+            # Capture profile at the prefer step
+            if step == self.args.profile_step:
+                # Wait until device execution catches up to tracing before triggering the profile. This will
+                # interrupt training slightly on the hosts which are capturing, but by waiting after tracing
+                # for the step, the interruption will be minimal.
+                xm.wait_device_ops()
+                xp.trace_detached('127.0.0.1:9012', self.args.profile_logdir, self.args.profile_duration)
+
         adjusted_elapsed_time = timer() - adjusted_start_time
 
         logger.info("Finished training run")
@@ -371,7 +390,7 @@ class PoorsManTrainer:
 def main():
     # Parse CLI arguments
     parser = HfArgumentParser(
-        (ModelArguments, DataTrainingArguments, TrainingArguments))
+        (ModelArguments, DataTrainingArguments, MoreTrainingArguments))
 
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
@@ -394,8 +413,8 @@ def main():
     transformers.utils.logging.enable_explicit_format()
 
     set_seed(training_args.seed)
-    # server = xp.start_server(9012)
-    # logger.info(f'Profiling server started: {str(server)}')
+    server = xp.start_server(9012)
+    logger.info(f'Profiling server started: {str(server)}')
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_id)
     config = AutoConfig.from_pretrained(
