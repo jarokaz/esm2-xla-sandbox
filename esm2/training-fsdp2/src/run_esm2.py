@@ -39,8 +39,16 @@ from typing import Optional, Union, List, Dict, Tuple
 from datasets import load_dataset
 from torch import nn
 from torch.optim import AdamW
-from torch.utils.data import DataLoader, Dataset, IterableDataset, RandomSampler, SequentialSampler
-from torch_xla.experimental.spmd_fully_sharded_data_parallel import SpmdFullyShardedDataParallel as FSDPv2
+from torch.utils.data import (
+    DataLoader,
+    Dataset,
+    IterableDataset,
+    RandomSampler,
+    SequentialSampler,
+)
+from torch_xla.experimental.spmd_fully_sharded_data_parallel import (
+    SpmdFullyShardedDataParallel as FSDPv2,
+)
 from torch_xla.distributed.fsdp.wrap import (
     size_based_auto_wrap_policy,
     transformer_auto_wrap_policy,
@@ -68,7 +76,11 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from transformers.trainer_pt_utils import get_module_class_from_name
-from transformers.modeling_outputs import CausalLMOutputWithPast, MaskedLMOutput, BaseModelOutputWithPastAndCrossAttentions
+from transformers.modeling_outputs import (
+    CausalLMOutputWithPast,
+    MaskedLMOutput,
+    BaseModelOutputWithPastAndCrossAttentions,
+)
 
 check_min_version("4.39.3")
 logger = logging.getLogger(__name__)
@@ -84,10 +96,14 @@ class ModelArguments:
     """
 
     model_id: Optional[str] = field(
-        default="facebook/esm2_t33_650M_UR50D", metadata={"help": "Pretrained config name or path if not the same as model_name"}
+        default="facebook/esm2_t33_650M_UR50D",
+        metadata={
+            "help": "Pretrained config name or path if not the same as model_name"
+        },
     )
     tokenizer_name: Optional[str] = field(
-        default=None, metadata={"help": "Name of the tokenizer if different from model_id"}
+        default=None,
+        metadata={"help": "Name of the tokenizer if different from model_id"},
     )
     torch_dtype: Optional[str] = field(
         default="bfloat16",
@@ -102,8 +118,10 @@ class ModelArguments:
     cache_dir: Optional[str] = field(
         default=None,
         metadata={
-            "help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
+            "help": "Where do you want to store the pretrained models downloaded from huggingface.co"
+        },
     )
+
 
 @dataclass
 class MoreTrainingArguments(TrainingArguments):
@@ -115,6 +133,9 @@ class MoreTrainingArguments(TrainingArguments):
     )
     profile_duration: Optional[int] = field(
         default="20000", metadata={"help": "Duration (ms) to capture profile"}
+    )
+    replicas: Optional[int] = field(
+        default=1, metadata={"help": "Number of replicas for multislice."}
     )
 
 
@@ -130,8 +151,7 @@ class DataTrainingArguments:
 
     mlm_probability: float = field(
         default=0.15,
-        metadata={
-            "help": "Ratio of tokens to mask for masked language modeling loss"},
+        metadata={"help": "Ratio of tokens to mask for masked language modeling loss"},
     )
 
 
@@ -145,28 +165,50 @@ class PoorsManTrainer:
         data_collator: Optional[DataCollatorForLanguageModeling],
         train_dataset: Optional[Union[Dataset, IterableDataset]],
         eval_dataset: Optional[Union[Dataset, Dict[str, Dataset]]],
-        optimizers: Tuple[torch.optim.Optimizer,
-                          torch.optim.lr_scheduler.LambdaLR],
+        optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR],
     ):
         self.args = args
         self.optimizer, self.lr_scheduler = optimizers
         self.model = model
-        self._check_model_optimizer_placement(self.model, self.optimizer)
         self.device = xm.xla_device()
         self.train_batch_size = args.per_device_train_batch_size
         self.eval_batch_size = args.per_device_eval_batch_size
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.data_collator = data_collator
-
+        self.replicas = self.args.replicas
         self.use_fsdp = True if args.fsdp else False
 
         # Set up SPMD mesh
         num_devices = xr.global_runtime_device_count()
-        xs.set_global_mesh(xs.Mesh(np.array(range(num_devices)),
-                           (num_devices, 1), axis_names=("fsdp", "tensor")))
-        self.input_sharding_spec = xs.ShardingSpec(
-            xs.get_global_mesh(), ("fsdp", None))
+        if self.replicas == 1:
+            xs.set_global_mesh(
+                xs.Mesh(
+                    np.array(range(num_devices)),
+                    (num_devices, 1),
+                    axis_names=("fsdp", "tensor"),
+                )
+            )
+            self.input_sharding_spec = xs.ShardingSpec(
+                xs.get_global_mesh(), ("fsdp", None)
+            )
+        else:
+            logger.info(f"Creating Mesh for {self.replicas} replicas")
+            dcn_axis = self.replicas
+            model_axis = 1  # For FSDP this is 1.
+            fsdp_axis = num_devices // model_axis // dcn_axis
+            ici_mesh_shape = (1, fsdp_axis, model_axis)
+            dcn_mesh_shape = (dcn_axis, 1, 1)
+            spmd_mesh = xs.HybridMesh(
+                ici_mesh_shape=ici_mesh_shape,
+                dcn_mesh_shape=dcn_mesh_shape,
+                axis_names=("dcn", "fsdp", "model"),
+            )
+            xs.set_global_mesh(spmd_mesh)
+            self.input_sharding_spec = xs.ShardingSpec(
+                mesh=xs.get_global_mesh(), partition_spec=(("dcn", "fsdp"), None)
+            )
+
         logger.info(f"Logical mesh shape: {xs.get_global_mesh().shape()}")
         logger.info(f"Input sharding: {self.input_sharding_spec}")
 
@@ -193,13 +235,15 @@ class PoorsManTrainer:
             batch_size=self.train_batch_size,
             num_workers=self.args.dataloader_num_workers,
             pin_memory=self.args.dataloader_pin_memory,
-            drop_last=self.args.dataloader_drop_last
+            drop_last=self.args.dataloader_drop_last,
         )
-        loader = pl.MpDeviceLoader(dataloader,
-                                   self.device,
-                                   input_sharding=self.input_sharding_spec,
-                                   loader_prefetch_size=self.train_batch_size,
-                                   device_prefetch_size=4)
+        loader = pl.MpDeviceLoader(
+            dataloader,
+            self.device,
+            input_sharding=self.input_sharding_spec,
+            loader_prefetch_size=self.train_batch_size,
+            device_prefetch_size=4,
+        )
         return loader
 
     def _get_eval_dataloader(self):
@@ -212,13 +256,15 @@ class PoorsManTrainer:
             batch_size=self.train_batch_size,
             num_workers=self.args.dataloader_num_workers,
             pin_memory=self.args.dataloader_pin_memory,
-            drop_last=self.args.dataloader_drop_last
+            drop_last=self.args.dataloader_drop_last,
         )
-        loader = pl.MpDeviceLoader(dataloader,
-                                   self.device,
-                                   input_sharding=self.input_sharding_spec,
-                                   loader_prefetch_size=self.eval_batch_size,
-                                   device_prefetch_size=4)
+        loader = pl.MpDeviceLoader(
+            dataloader,
+            self.device,
+            input_sharding=self.input_sharding_spec,
+            loader_prefetch_size=self.eval_batch_size,
+            device_prefetch_size=4,
+        )
         return loader
 
     def _wrap_model(self, model):
@@ -227,28 +273,28 @@ class PoorsManTrainer:
             auto_wrap_policy = None
             auto_wrapper_callable = None
             default_transformer_cls_names_to_wrap = getattr(
-                model, "_no_split_modules", None)
+                model, "_no_split_modules", None
+            )
             default_transformer_cls_names_to_wrap = None
             fsdp_transformer_layer_cls_to_wrap = self.args.fsdp_config.get(
                 "transformer_layer_cls_to_wrap", default_transformer_cls_names_to_wrap
             )
             if self.args.fsdp_config["min_num_params"] > 0:
                 auto_wrap_policy = functools.partial(
-                    size_based_auto_wrap_policy, min_num_params=self.args.fsdp_config[
-                        "min_num_params"]
+                    size_based_auto_wrap_policy,
+                    min_num_params=self.args.fsdp_config["min_num_params"],
                 )
             elif fsdp_transformer_layer_cls_to_wrap is not None:
                 transformer_cls_to_wrap = set()
                 for layer_class in fsdp_transformer_layer_cls_to_wrap:
-                    transformer_cls = get_module_class_from_name(
-                        model, layer_class)
+                    transformer_cls = get_module_class_from_name(model, layer_class)
                     if transformer_cls is None:
                         raise Exception(
-                            "Could not find the transformer layer class to wrap in the model.")
+                            "Could not find the transformer layer class to wrap in the model."
+                        )
                     else:
                         transformer_cls_to_wrap.add(transformer_cls)
-                logger.info(
-                    f"ESM2 classes to wrap: {transformer_cls_to_wrap}")
+                logger.info(f"ESM2 classes to wrap: {transformer_cls_to_wrap}")
                 auto_wrap_policy = functools.partial(
                     transformer_auto_wrap_policy,
                     # Transformer layer class to wrap
@@ -275,8 +321,12 @@ class PoorsManTrainer:
                     real_output = output.logits
                 if real_output is None:
                     raise ValueError(
-                        "Something went wrong, the output of the model shouldn't be `None`")
-                xs.mark_sharding(real_output, mesh, ("fsdp", None, None))
+                        "Something went wrong, the output of the model shouldn't be `None`"
+                    )
+                if self.replicas > 1:
+                    xs.mark_sharding(real_output, mesh, (("dcn", "fsdp"), None, None))
+                else:
+                    xs.mark_sharding(real_output, mesh, ("fsdp", None, None))
 
             model = FSDPv2(
                 model,
@@ -285,19 +335,19 @@ class PoorsManTrainer:
                 auto_wrapper_callable=auto_wrapper_callable,
             )
 
-            def patched_optimizer_step(optimizer, barrier=False, optimizer_args={}):
-                loss = optimizer.step(**optimizer_args)
-                if barrier:
-                    xm.mark_step()
-                return loss
+            # def patched_optimizer_step(optimizer, barrier=False, optimizer_args={}):
+            #     loss = optimizer.step(**optimizer_args)
+            #     if barrier:
+            #         xm.mark_step()
+            #     return loss
 
-            xm.optimizer_step = patched_optimizer_step
+            # xm.optimizer_step = patched_optimizer_step
         else:
             logger.info("Using DDP. Model not wrapped")
 
         return model
 
-    def _log_metrics(self, step, start_time, loss,  sample_count):
+    def _log_metrics(self, step, start_time, loss, sample_count):
         xm.mark_step()
         loss = loss.item()
         now = timer()
@@ -329,16 +379,29 @@ class PoorsManTrainer:
         train_iterator = iter(train_loader)
         model = self._wrap_model(self.model)
 
+        self.optimizer = AdamW(
+            params=model.parameters(),
+            lr=self.args.learning_rate,
+            betas=(self.args.adam_beta1, self.args.adam_beta2),
+            eps=self.args.adam_epsilon,
+        )
+
+        steps = self.args.max_steps
+        self.lr_scheduler = get_scheduler(
+            name=self.args.lr_scheduler_type,
+            optimizer=self.optimizer,
+            num_warmup_steps=self.args.warmup_steps,
+            num_training_steps=steps,
+        )
+        self._check_model_optimizer_placement(self.model, self.optimizer)
+
         logger.info("Starting training")
         logger.info(f"    Using {'FSDP' if self.use_fsdp else 'DDP'}")
         logger.info(f"    Start step: {start_step}")
         logger.info(f"    Max step: {max_step}")
         logger.info(f"    Global batch size: {self.train_batch_size}")
 
-        self.run_history = {
-            "step_history": [],
-            "elapsed_time": 0.0
-        }
+        self.run_history = {"step_history": [], "elapsed_time": 0.0}
         sample_count = self.train_batch_size * self.args.logging_steps
         total_steps = 0
         start_time = timer()
@@ -376,7 +439,11 @@ class PoorsManTrainer:
                 # interrupt training slightly on the hosts which are capturing, but by waiting after tracing
                 # for the step, the interruption will be minimal.
                 xm.wait_device_ops()
-                xp.trace_detached('127.0.0.1:9012', self.args.profile_logdir, self.args.profile_duration)
+                xp.trace_detached(
+                    "127.0.0.1:9012",
+                    self.args.profile_logdir,
+                    self.args.profile_duration,
+                )
 
         adjusted_elapsed_time = timer() - adjusted_start_time
 
@@ -387,19 +454,22 @@ class PoorsManTrainer:
         logger.info(f"  Number of steps: {adjusted_total_steps}")
         logger.info(f"  Elapsed time: {adjusted_elapsed_time:0.2f}")
         logger.info(
-            f"  Steps per second: {adjusted_total_steps/adjusted_elapsed_time:0.2f}")
+            f"  Steps per second: {adjusted_total_steps/adjusted_elapsed_time:0.2f}"
+        )
 
 
 def main():
     # Parse CLI arguments
     parser = HfArgumentParser(
-        (ModelArguments, DataTrainingArguments, MoreTrainingArguments))
+        (ModelArguments, DataTrainingArguments, MoreTrainingArguments)
+    )
 
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
         # let's parse it to get our arguments.
         model_args, data_args, training_args = parser.parse_json_file(
-            json_file=os.path.abspath(sys.argv[1]))
+            json_file=os.path.abspath(sys.argv[1])
+        )
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -417,9 +487,11 @@ def main():
 
     set_seed(training_args.seed)
     server = xp.start_server(9012)
-    logger.info(f'Profiling server started: {str(server)}')
+    logger.info(f"Profiling server started: {str(server)}")
 
-    tokenizer_name = model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_id
+    tokenizer_name = (
+        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_id
+    )
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
     config = AutoConfig.from_pretrained(
         model_args.model_id,
@@ -428,31 +500,14 @@ def main():
     )
     model = EsmForMaskedLM(config)
     logger.info(f"Loaded model: {model_args.model_id}")
-    logger.info(f"Model parameters: {model.num_parameters}")
+    logger.info(f"Model parameters: {model.num_parameters()}")
 
-    model = apply_xla_patch_to_nn_linear(
-        model, xs.xla_patched_nn_linear_forward)
+    model = apply_xla_patch_to_nn_linear(model, xs.xla_patched_nn_linear_forward)
 
-    model = model.to(xm.xla_device(), dtype=getattr(
-        torch, model_args.torch_dtype))
-
-    optimizer = AdamW(
-        params=model.parameters(),
-        lr=training_args.learning_rate,
-        betas=(training_args.adam_beta1, training_args.adam_beta2),
-        eps=training_args.adam_epsilon)
-
-    steps = training_args.max_steps
-    lr_scheduler = get_scheduler(
-        name=training_args.lr_scheduler_type,
-        optimizer=optimizer,
-        num_warmup_steps=training_args.warmup_steps,
-        num_training_steps=steps
-    )
+    model = model.to(xm.xla_device(), dtype=getattr(torch, model_args.torch_dtype))
 
     data_collator = DataCollatorForLanguageModeling(
-        tokenizer=tokenizer,
-        mlm_probability=data_args.mlm_probability
+        tokenizer=tokenizer, mlm_probability=data_args.mlm_probability
     )
 
     # Load datasets
@@ -466,7 +521,7 @@ def main():
         data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        optimizers=(optimizer, lr_scheduler)
+        optimizers=(None, None),
     )
 
     results = trainer.train_loop()
